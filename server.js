@@ -2,6 +2,7 @@
    PONTE LOGISTICO — Server per Render (due PC)
    Chat condivisa Campionario ⇄ Produzione.
    Tre comandi: Spedizione in partenza / Mi unisco / Non mi unisco.
+   Accesso solo dalla rete aziendale e solo da computer (vedi sotto).
    ============================================================ */
 
 const express = require("express");
@@ -11,6 +12,119 @@ const webpush = require("web-push");
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
+
+/* ============================================================
+   ACCESSO SOLO DALLA RETE AZIENDALE E SOLO DA COMPUTER
+   ------------------------------------------------------------
+   Gli indirizzi ammessi si cambiano su Render → Environment →
+   ALLOWED_IPS (uno o più, separati da virgola; accetta anche
+   intervalli tipo 162.120.188.0/24 o 2001:db8::/48).
+   Se ALLOWED_IPS non è impostata vale l'indirizzo qui sotto.
+   /ping resta aperto: serve a cron-job.org per tenere sveglio
+   il server e non mostra nessun dato.
+   ============================================================ */
+const IP_AZIENDA_PREDEFINITO = "162.120.188.9";
+const IP_AMMESSI = String(process.env.ALLOWED_IPS || IP_AZIENDA_PREDEFINITO)
+  .split(/[\s,;]+/).map(function(s){ return s.trim(); }).filter(Boolean);
+
+function ipv4Numero(ip){
+  const p = String(ip).split(".");
+  if (p.length !== 4) return null;
+  let n = 0;
+  for (const x of p) { if (!/^\d{1,3}$/.test(x) || Number(x) > 255) return null; n = n * 256 + Number(x); }
+  return n;
+}
+function ipv6Numero(ip){
+  ip = String(ip).toLowerCase();
+  const v4 = ip.match(/^(.*:)(\d+\.\d+\.\d+\.\d+)$/);            /* forma mista ::ffff:1.2.3.4 */
+  if (v4) { const n = ipv4Numero(v4[2]); if (n === null) return null;
+    ip = v4[1] + Math.floor(n / 65536).toString(16) + ":" + (n % 65536).toString(16); }
+  const meta = ip.split("::");
+  if (meta.length > 2) return null;
+  const testa = meta[0] ? meta[0].split(":") : [];
+  const coda = meta.length === 2 && meta[1] ? meta[1].split(":") : [];
+  const zeri = 8 - testa.length - coda.length;
+  if (meta.length === 1 && testa.length !== 8) return null;
+  if (meta.length === 2 && zeri < 1) return null;
+  const gruppi = testa.concat(new Array(meta.length === 2 ? zeri : 0).fill("0"), coda);
+  let n = 0n;
+  for (const g of gruppi) { if (!/^[0-9a-f]{1,4}$/.test(g)) return null; n = (n << 16n) + BigInt(parseInt(g, 16)); }
+  return n;
+}
+function pulisciIP(ip){
+  ip = String(ip || "").split(",")[0].trim().replace(/^\[|\]$/g, "").replace(/%.*$/, "");
+  if (/^::ffff:\d+\.\d+\.\d+\.\d+$/i.test(ip)) ip = ip.slice(7);
+  return ip;
+}
+function ipCorrisponde(ip, regola){
+  const parti = regola.split("/");
+  const base = parti[0], lung = parti[1];
+  if (base.indexOf(":") === -1) {                                   /* IPv4 */
+    const a = ipv4Numero(ip), b = ipv4Numero(base);
+    if (a === null || b === null) return false;
+    const n = lung === undefined ? 32 : Number(lung);
+    if (!(n >= 0 && n <= 32)) return false;
+    const blocco = Math.pow(2, 32 - n);
+    return Math.floor(a / blocco) === Math.floor(b / blocco);
+  }
+  const a = ipv6Numero(ip), b = ipv6Numero(base);                   /* IPv6 */
+  if (a === null || b === null) return false;
+  const n = lung === undefined ? 128 : Number(lung);
+  if (!(n >= 0 && n <= 128)) return false;
+  const sposta = BigInt(128 - n);
+  return (a >> sposta) === (b >> sposta);
+}
+/* Render passa dietro Cloudflare: l'indirizzo vero del visitatore è in CF-Connecting-IP
+   (o True-Client-IP), che Cloudflare riscrive sempre. X-Forwarded-For NON si usa:
+   chi si collega può falsificarne la prima voce. */
+function ipVisitatore(req){
+  return pulisciIP(req.headers["cf-connecting-ip"] || req.headers["true-client-ip"] || (req.socket && req.socket.remoteAddress));
+}
+const RE_TELEFONO = /Android|iPhone|iPad|iPod|Mobi|Windows Phone|IEMobile|BlackBerry|BB10|Opera Mini|webOS|Silk|Kindle|KFAPWI/i;
+function daTelefono(req){
+  return RE_TELEFONO.test(String(req.headers["user-agent"] || "")) || req.headers["sec-ch-ua-mobile"] === "?1";
+}
+function paginaBloccata(motivo, ip){
+  const rete = motivo === "rete";
+  const titolo = rete ? "Accesso riservato alla rete aziendale" : "Si usa solo dai computer aziendali";
+  const testo = rete
+    ? "Il Ponte Logistico funziona solo dai computer collegati alla Wi-Fi o alla rete dell'azienda."
+    : "Il Ponte Logistico non si può usare da telefono o tablet. Aprilo da un computer aziendale.";
+  const nota = rete
+    ? "Indirizzo rilevato: <b>" + String(ip || "sconosciuto").replace(/[<>&"]/g, "") + "</b><br>Se sei in azienda e vedi questo messaggio, l'indirizzo internet dell'azienda potrebbe essere cambiato: avvisa il responsabile."
+    : "";
+  return "<!doctype html><html lang=\"it\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">" +
+    "<meta name=\"robots\" content=\"noindex\"><title>Ponte Logistico — accesso non consentito</title>" +
+    "<style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0b0d10;color:#eef2f6;" +
+    "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding:24px;box-sizing:border-box}" +
+    ".c{max-width:460px;background:#14171c;border:1px solid #272d38;border-radius:16px;padding:28px 26px;text-align:center}" +
+    ".i{font-size:40px}h1{font-size:19px;margin:12px 0 8px}p{color:#93a0b0;font-size:14px;line-height:1.55;margin:0 0 10px}" +
+    "small{display:block;color:#5f6b7a;font-size:12px;line-height:1.6;margin-top:14px}b{color:#eef2f6}</style></head><body>" +
+    "<div class=\"c\"><div class=\"i\">" + (rete ? "🔒" : "💻") + "</div><h1>" + titolo + "</h1><p>" + testo + "</p>" +
+    (nota ? "<small>" + nota + "</small>" : "") + "</div></body></html>";
+}
+const ultimoAvviso = new Map();
+app.use(function(req, res, next){
+  if (req.path === "/ping") return next();
+  const ip = ipVisitatore(req);
+  const reteOk = IP_AMMESSI.some(function(r){ return ipCorrisponde(ip, r); });
+  const telefono = daTelefono(req);
+  if (reteOk && !telefono) return next();
+  const chiave = (reteOk ? "tel " : "rete ") + ip;
+  if (Date.now() - (ultimoAvviso.get(chiave) || 0) > 3600000) {        /* una riga di log all'ora per indirizzo */
+    ultimoAvviso.set(chiave, Date.now());
+    if (ultimoAvviso.size > 500) ultimoAvviso.clear();
+    console.warn("Accesso bloccato (" + (reteOk ? "telefono/tablet" : "rete non aziendale") + ") da " + ip + " — " + req.method + " " + req.path);
+  }
+  res.setHeader("Cache-Control", "no-store");
+  if (req.path.indexOf("/api/") === 0 || req.path === "/sw.js") {
+    return res.status(403).json({ error: reteOk ? "Il Ponte Logistico si usa solo dai computer aziendali." : "Accesso consentito solo dalla rete aziendale." });
+  }
+  res.status(403).setHeader("Content-Type", "text/html; charset=utf-8");
+  res.send(paginaBloccata(reteOk ? "telefono" : "rete", ip));
+});
+console.log("Accesso consentito solo da: " + IP_AMMESSI.join(", "));
+
 app.use(express.json({ limit: "2mb" }));
 
 /* ---------- Stato condiviso ---------- */

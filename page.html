@@ -450,6 +450,22 @@
 <div class="toast-wrap" id="toasts" aria-live="polite"></div>
 
 <script>
+/* ---------- solo computer: secondo controllo nella pagina ----------
+   Il server blocca già telefoni e tablet; qui si fermano anche quelli che si
+   presentano come computer (iPad, tablet in "versione desktop"). */
+(function(){
+  const ua = navigator.userAgent || "";
+  const iPad = /Macintosh/.test(ua) && navigator.maxTouchPoints > 1;
+  const soloTouch = !!(window.matchMedia && matchMedia("(pointer: coarse)").matches && !matchMedia("(any-pointer: fine)").matches);
+  if (/Android|iPhone|iPad|iPod|Mobi/i.test(ua) || iPad || soloTouch) {
+    document.body.innerHTML = '<div style="margin:auto;max-width:460px;background:#14171c;border:1px solid #272d38;border-radius:16px;padding:28px 26px;text-align:center">' +
+      '<div style="font-size:40px">💻</div><h1 style="font-size:19px;margin:12px 0 8px">Si usa solo dai computer aziendali</h1>' +
+      '<p style="color:#93a0b0;font-size:14px;line-height:1.55">Il Ponte Logistico non si può usare da telefono o tablet. Aprilo da un computer aziendale.</p></div>';
+    document.body.style.cssText = "display:flex;align-items:center;justify-content:center;padding:24px;height:100vh";
+    throw new Error("Ponte Logistico: dispositivo non consentito");
+  }
+})();
+
 /* =========================================================
    Ponte Logistico — client
    ========================================================= */
