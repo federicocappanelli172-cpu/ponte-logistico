@@ -13,6 +13,29 @@ const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 app.use(express.json({ limit: "2mb" }));
 
+/* ---------- Solo da computer: dal telefono si vede solo un avviso ---------- */
+const RE_TELEFONO = /Mobi|iPhone|iPod|Android.+Mobile|Windows Phone|BlackBerry|BB10|Opera Mini|IEMobile/i;
+const PAGINA_TELEFONO = "<!doctype html><html lang=\"it\"><head><meta charset=\"utf-8\">" +
+  "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><title>Ponte Logistico</title></head>" +
+  "<body style=\"margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0b0d10;" +
+  "color:#eef2f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding:24px;box-sizing:border-box\">" +
+  "<div style=\"max-width:360px;text-align:center;background:#14171c;border:1px solid #272d38;border-radius:16px;padding:28px 22px\">" +
+  "<div style=\"font-size:44px\">💻</div>" +
+  "<h1 style=\"font-size:19px;margin:12px 0 8px\">Ponte Logistico si usa solo da computer</h1>" +
+  "<p style=\"font-size:14px;color:#93a0b0;line-height:1.5;margin:0\">Apri <b style=\"color:#eef2f6\">ponte-logistico.onrender.com</b> " +
+  "dal PC del tuo reparto.</p></div></body></html>";
+/* Il tipo di dispositivo serve solo a decidere cosa mostrare: dei telefoni non si registra
+   nulla (né IP, né dispositivo, né orario), in nessun file e in nessun log. */
+app.use(function(req, res, next){
+  res.setHeader("Vary", "User-Agent");
+  if (req.path === "/ping" || !RE_TELEFONO.test(req.headers["user-agent"] || "")) return next();
+  res.statusCode = 403;
+  res.setHeader("Cache-Control", "no-store");
+  if (req.path.indexOf("/api/") === 0) return res.json({ error: "Ponte Logistico si usa solo da computer." });
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.send(PAGINA_TELEFONO);
+});
+
 /* ---------- Stato condiviso ---------- */
 const DB_FILE = path.join(__dirname, "dati.json");
 let DB = {

@@ -453,6 +453,24 @@
 /* =========================================================
    Ponte Logistico — client
    ========================================================= */
+/* Solo da computer: blocca i telefoni anche con "Richiedi sito desktop" attivo
+   (schermo piccolo + touch). I tablet e i PC con schermo touch funzionano. */
+const DA_TELEFONO = /Mobi|iPhone|iPod|Android.+Mobile|Windows Phone|BlackBerry|BB10|Opera Mini|IEMobile/i.test(navigator.userAgent)
+  || !!(navigator.userAgentData && navigator.userAgentData.mobile)
+  || (navigator.maxTouchPoints > 0 && Math.min(screen.width, screen.height) < 600);
+if (DA_TELEFONO) {
+  document.title = "Ponte Logistico — solo da computer";
+  document.body.innerHTML =
+    '<div style="margin:auto;max-width:360px;text-align:center;background:var(--panel);border:1px solid var(--line);' +
+    'border-radius:16px;padding:28px 22px">' +
+    '<div style="font-size:44px">💻</div>' +
+    '<h1 style="font-size:19px;margin:12px 0 8px">Ponte Logistico si usa solo da computer</h1>' +
+    '<p style="font-size:14px;color:var(--muted);line-height:1.5">Apri <b style="color:var(--txt)">ponte-logistico.onrender.com</b> ' +
+    'dal PC del tuo reparto.</p></div>';
+  document.body.style.padding = "24px";
+  throw new Error("Ponte Logistico: accesso da telefono non consentito");
+}
+
 /* Si sceglie solo il reparto: è anche il "nome" con cui si pubblica e si risponde. */
 const REPARTI = ["Campionario", "Produzione", "Spedizioni"];
 /* stile, icona e partenza proposta per ogni reparto */
