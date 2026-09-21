@@ -240,21 +240,18 @@
   .login-head h2{font-size:18px;font-weight:800}
   .login-head p{font-size:12px;color:var(--muted);margin-top:2px}
   .login-card > p.ask{font-size:13.5px;color:var(--muted);margin:16px 0 18px;line-height:1.5}
-  .login-group{margin-bottom:18px}
-  .login-group .gh{font-size:11px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;
-    margin-bottom:10px;display:flex;align-items:center;gap:7px}
-  .login-group.camp .gh{color:var(--camp)}
-  .login-group.prod .gh{color:var(--prod)}
-  .login-names{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:9px}
-  .name-btn{display:flex;align-items:center;gap:9px;padding:12px 13px;border-radius:var(--r-md);
-    border:1.5px solid var(--line);background:var(--panel2);color:var(--txt);font-size:14px;
-    font-weight:650;cursor:pointer;transition:.12s;text-align:left}
-  .name-btn .av{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;
-    justify-content:center;font-size:11.5px;font-weight:900;flex-shrink:0;letter-spacing:-.2px}
-  .login-group.camp .name-btn .av{background:rgba(177,138,255,.2);color:var(--camp)}
-  .login-group.prod .name-btn .av{background:rgba(255,180,84,.2);color:var(--prod)}
-  .login-group.camp .name-btn:hover{border-color:var(--camp);background:rgba(177,138,255,.1)}
-  .login-group.prod .name-btn:hover{border-color:var(--prod);background:rgba(255,180,84,.1)}
+  .rep-choice{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
+  .rep-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;
+    padding:26px 16px 22px;border-radius:var(--r-lg);border:1.5px solid var(--line);background:var(--panel2);
+    color:var(--txt);cursor:pointer;transition:.12s;text-align:center;font-family:inherit}
+  .rep-btn .ic{font-size:38px;line-height:1}
+  .rep-btn .nm{display:block;font-size:17px;font-weight:800}
+  .rep-btn .ds{display:block;font-size:11.5px;color:var(--muted);line-height:1.45;max-width:190px;margin:6px auto 0}
+  .rep-btn.camp .nm{color:var(--camp)}
+  .rep-btn.prod .nm{color:var(--prod)}
+  .rep-btn.camp:hover,.rep-btn.camp.sel{border-color:var(--camp);background:rgba(177,138,255,.1)}
+  .rep-btn.prod:hover,.rep-btn.prod.sel{border-color:var(--prod);background:rgba(255,180,84,.1)}
+  .rep-btn:active{transform:scale(.98)}
   .login-card .foot{font-size:11.5px;color:var(--faint);line-height:1.6;border-top:1px solid var(--line);
     padding-top:14px;margin-top:4px}
   #loginCancel{margin-top:12px;width:100%;background:var(--panel2);color:var(--muted);
@@ -267,7 +264,7 @@
     border-radius:var(--r-sm);padding:6px 11px 6px 7px;cursor:pointer;transition:.12s}
   .whochip:hover{border-color:var(--acc)}
   .whochip .av{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;
-    justify-content:center;font-size:11px;font-weight:900;flex-shrink:0;letter-spacing:-.2px}
+    justify-content:center;font-size:14px;font-weight:900;flex-shrink:0;letter-spacing:-.2px}
   .whochip.camp .av{background:var(--camp);color:#160b2c}
   .whochip.prod .av{background:var(--prod);color:#2c1600}
   .whochip .nm{display:block;font-size:13px;font-weight:700;line-height:1.25}
@@ -296,9 +293,12 @@
   @media (max-width: 620px){
     .whochip .rp{display:none}
     .whochip{padding:5px 9px 5px 5px}
-    .login-names{grid-template-columns:1fr 1fr}
   }
   @media (max-width: 480px){
+    .rep-choice{grid-template-columns:1fr}
+    .rep-btn{flex-direction:row;justify-content:flex-start;text-align:left;padding:16px;gap:14px}
+    .rep-btn .ic{font-size:30px}
+    .rep-btn .ds{margin:4px 0 0;max-width:none}
     .row-buttons{grid-template-columns:1fr 1fr}
     .row-buttons .b-ship{grid-column:1 / -1}
     .votebox{grid-template-columns:1fr}
@@ -326,17 +326,20 @@
         <p>Campionario ⇄ Produzione</p>
       </div>
     </div>
-    <p class="ask">Chi sei? Seleziona il tuo nome per entrare: il reparto viene impostato in automatico.</p>
-    <div class="login-group camp">
-      <div class="gh">🏷️ Campionario</div>
-      <div class="login-names" id="namesCamp"></div>
+    <p class="ask">Da quale reparto usi l'app? Sceglilo una volta sola: resta salvato su questo computer.</p>
+    <div class="rep-choice">
+      <button type="button" class="rep-btn camp" data-rep="Campionario">
+        <span class="ic">🏷️</span>
+        <span><span class="nm">Campionario</span>
+        <span class="ds">Ricevi gli avvisi delle spedizioni della Produzione</span></span>
+      </button>
+      <button type="button" class="rep-btn prod" data-rep="Produzione">
+        <span class="ic">🏭</span>
+        <span><span class="nm">Produzione</span>
+        <span class="ds">Ricevi gli avvisi delle spedizioni del Campionario</span></span>
+      </button>
     </div>
-    <div class="login-group prod">
-      <div class="gh">🏭 Produzione</div>
-      <div class="login-names" id="namesProd"></div>
-    </div>
-    <div class="foot">Il nome resta salvato su questo dispositivo: lo inserisci una volta sola.
-      Puoi cambiarlo quando vuoi dal tuo nome in alto a destra.</div>
+    <div class="foot">Puoi cambiare reparto quando vuoi cliccando sul nome del reparto in alto a destra.</div>
     <button id="loginCancel">Annulla</button>
   </div>
 </div>
@@ -369,7 +372,7 @@
     </div>
     <div class="right">
       <button id="btnNotif" title="Attiva gli avvisi anche a scheda abbassata">🔔 <span class="notif-label">Attiva notifiche</span></button>
-      <div class="whochip" id="whoChip" role="button" tabindex="0" title="Cambia operatore">
+      <div class="whochip" id="whoChip" role="button" tabindex="0" title="Cambia reparto">
         <span class="av" id="whoAv">?</span>
         <span><span class="nm" id="whoNm">—</span><span class="rp" id="whoRp">—</span></span>
         <span class="caret">▼</span>
@@ -441,28 +444,14 @@
 /* =========================================================
    Ponte Logistico — client
    ========================================================= */
-/* Operatori abilitati, divisi per reparto. Per aggiungere o togliere
-   qualcuno basta modificare queste due liste. */
-const OPERATORI = {
-  Campionario: ["Federica S", "Federica L", "Angela", "Ilaria", "Gloria"],
-  Produzione:  ["Simone", "Samuele", "Lavinia"],
-};
-/* iniziali per l'avatar: "Federica S" -> "FS", "Angela" -> "A" */
-function iniziali(nome){
-  const parti = String(nome || "?").trim().split(/\s+/);
-  return ((parti[0][0] || "?") + (parti[1] ? parti[1][0] : "")).toUpperCase();
-}
-function repDi(nome){
-  if (OPERATORI.Campionario.indexOf(nome) !== -1) return "Campionario";
-  if (OPERATORI.Produzione.indexOf(nome) !== -1) return "Produzione";
-  return null;
-}
+/* Si sceglie solo il reparto: è anche il "nome" con cui si pubblica e si risponde. */
+const REPARTI = ["Campionario", "Produzione"];
+function repValido(r){ return REPARTI.indexOf(r) !== -1 ? r : ""; }
 
 let DB = { tratte: [], seq: 1 };
 let ACTIVE = localStorage.getItem("pl_active") || null;
-let ME = localStorage.getItem("pl_operatore") || "";
-let REP = repDi(ME) || "";
-if (!REP) { ME = ""; }
+let REP = repValido(localStorage.getItem("pl_reparto"));
+let ME = REP;
 const seen = new Set();
 let primed = false;
 let firstRender = true;
@@ -617,44 +606,34 @@ if ("Notification" in window && Notification.permission === "granted") {
   $("btnNotif").classList.add("on"); $("btnNotif").innerHTML = '🔔 <span class="notif-label">Notifiche attive</span>';
 }
 
-/* ---------- accesso operatore ---------- */
-function buildLogin(){
-  [["Campionario","namesCamp"],["Produzione","namesProd"]].forEach(([rep, boxId]) => {
-    const box = $(boxId); box.innerHTML = "";
-    OPERATORI[rep].forEach(nome => {
-      const b = document.createElement("button");
-      b.type = "button"; b.className = "name-btn";
-      b.innerHTML = '<span class="av">' + esc(iniziali(nome)) + '</span>' + esc(nome);
-      b.onclick = () => entra(nome, rep);
-      box.appendChild(b);
-    });
-  });
-}
-function entra(nome, rep){
-  ME = nome; REP = rep;
-  localStorage.setItem("pl_operatore", ME);
+/* ---------- scelta del reparto ---------- */
+document.querySelectorAll(".rep-btn").forEach(b => { b.onclick = () => entra(b.dataset.rep); });
+function entra(rep){
+  REP = ME = repValido(rep);
+  localStorage.setItem("pl_reparto", REP);
+  localStorage.removeItem("pl_operatore"); /* versione precedente con i nomi */
   $("login").classList.remove("on", "switching");
   renderMe();
   renderAll();
   attivaPush();
 }
 function apriLogin(switching){
+  document.querySelectorAll(".rep-btn").forEach(b => b.classList.toggle("sel", b.dataset.rep === REP));
   $("login").classList.toggle("switching", !!switching);
   $("login").classList.add("on");
 }
 function renderMe(){
   const chip = $("whoChip");
   chip.className = "whochip " + (REP === "Produzione" ? "prod" : "camp");
-  $("whoAv").textContent = ME ? iniziali(ME) : "?";
-  $("whoNm").textContent = ME || "Accedi";
-  $("whoRp").textContent = REP || "—";
+  $("whoAv").textContent = REP === "Produzione" ? "🏭" : REP ? "🏷️" : "?";
+  $("whoNm").textContent = REP || "Scegli reparto";
+  $("whoRp").textContent = REP ? "cambia reparto" : "—";
 }
 $("whoChip").onclick = () => apriLogin(true);
 $("whoChip").onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); apriLogin(true); } };
 $("loginCancel").onclick = () => $("login").classList.remove("on", "switching");
-buildLogin();
 renderMe();
-if (!ME) apriLogin(false);
+if (!REP) apriLogin(false);
 
 /* ---------- render ---------- */
 function renderTratte(){
