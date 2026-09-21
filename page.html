@@ -466,6 +466,7 @@ if (!REP) { ME = ""; }
 const seen = new Set();
 let primed = false;
 let firstRender = true;
+let PUSH_OK = false; /* true quando questo browser riceve le notifiche push dal server */
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;" }[c]));
@@ -523,7 +524,8 @@ function notify(title, body, onclick, suona){
   el.onclick = () => { if (onclick) onclick(); el.remove(); };
   $("toasts").appendChild(el);
   setTimeout(() => el.remove(), 12000);
-  if ("Notification" in window && Notification.permission === "granted") {
+  /* con le notifiche push attive, quelle di sistema le manda il server (niente doppioni) */
+  if (!PUSH_OK && "Notification" in window && Notification.permission === "granted") {
     try {
       const n = new Notification(title, { body, tag: "ponte-" + Date.now() });
       n.onclick = () => { window.focus(); if (onclick) onclick(); n.close(); };
@@ -548,6 +550,54 @@ function flashTitle(msg){
   document.addEventListener("visibilitychange", stop);
 }
 
+/* ---------- notifiche push: arrivano anche a browser abbassato o scheda chiusa ---------- */
+const PUSH_SUPPORTED = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+const swReady = PUSH_SUPPORTED
+  ? navigator.serviceWorker.register("/sw.js").then(() => navigator.serviceWorker.ready)
+      .catch(e => { console.warn("Service worker non registrato:", e); return null; })
+  : Promise.resolve(null);
+
+function b64ToU8(s){
+  const pad = "=".repeat((4 - s.length % 4) % 4);
+  const b = atob((s + pad).replace(/-/g, "+").replace(/_/g, "/"));
+  return Uint8Array.from(b, c => c.charCodeAt(0));
+}
+function stessaChiave(sub, key){
+  const k = sub && sub.options && sub.options.applicationServerKey;
+  if (!k) return true;
+  const a = new Uint8Array(k), b = b64ToU8(key);
+  return a.length === b.length && a.every((x, i) => x === b[i]);
+}
+/* iscrive questo browser e comunica al server chi sei; si ripete a ogni apertura e riconnessione,
+   così le notifiche ripartono da sole anche dopo un riavvio del server */
+let pushInCorso = null;
+function attivaPush(){
+  if (!PUSH_SUPPORTED || Notification.permission !== "granted") return Promise.resolve(false);
+  if (pushInCorso) return pushInCorso;
+  pushInCorso = (async () => {
+    const reg = await swReady;
+    if (!reg) return false;
+    const { key } = await (await fetch("/api/push/key")).json();
+    let sub = await reg.pushManager.getSubscription();
+    let oldEndpoint = null;
+    if (sub && !stessaChiave(sub, key)) { oldEndpoint = sub.endpoint; await sub.unsubscribe(); sub = null; }
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToU8(key) });
+    const r = await fetch("/api/push/subscribe", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sub: sub.toJSON(), who: ME, rep: REP, oldEndpoint }),
+    });
+    PUSH_OK = !!(await r.json()).ok;
+    return PUSH_OK;
+  })().catch(e => { console.warn("Notifiche push non attive, uso quelle della pagina:", e); PUSH_OK = false; return false; })
+    .finally(() => { pushInCorso = null; });
+  return pushInCorso;
+}
+/* clic su una notifica mentre l'app è già aperta: mostra la spedizione */
+if (PUSH_SUPPORTED) navigator.serviceWorker.addEventListener("message", e => {
+  const d = e.data || {};
+  if (d.type === "apri" && d.trattaId) refresh().then(() => focusCard(d.trattaId, d.itemId));
+});
+
 $("btnNotif").onclick = async () => {
   try { beep(); } catch(e){}
   if (!("Notification" in window)) { notify("Non supportato", "Questo browser non supporta le notifiche desktop.", null, false); return; }
@@ -555,7 +605,10 @@ $("btnNotif").onclick = async () => {
   if (p === "granted") {
     $("btnNotif").classList.add("on");
     $("btnNotif").innerHTML = '🔔 <span class="notif-label">Notifiche attive</span>';
-    new Notification("Ponte Logistico", { body: "Perfetto! Riceverai un avviso ad ogni spedizione." });
+    const push = await attivaPush();
+    new Notification("Ponte Logistico", { body: push
+      ? "Perfetto! Riceverai gli avvisi anche a browser abbassato o con la scheda chiusa."
+      : "Perfetto! Riceverai un avviso ad ogni spedizione (tieni aperta la scheda)." });
   } else {
     notify("Notifiche bloccate", "Riattivale dall'icona lucchetto nella barra degli indirizzi.", null, false);
   }
@@ -583,6 +636,7 @@ function entra(nome, rep){
   $("login").classList.remove("on", "switching");
   renderMe();
   renderAll();
+  attivaPush();
 }
 function apriLogin(switching){
   $("login").classList.toggle("switching", !!switching);
@@ -741,7 +795,7 @@ function applyState(next, doNotify){
 let reconnectTimer = null;
 function connect(){
   const es = new EventSource("/api/stream");
-  es.addEventListener("hello", () => { $("live").classList.add("on"); $("liveTxt").textContent = "online · sincronizzato"; });
+  es.addEventListener("hello", () => { $("live").classList.add("on"); $("liveTxt").textContent = "online · sincronizzato"; attivaPush(); });
   es.addEventListener("ship", e => { const d = JSON.parse(e.data); refresh(d.trattaId, d.item.id); });
   es.addEventListener("vote", () => refresh());
   es.addEventListener("tratta", () => refresh());
@@ -857,7 +911,8 @@ setInterval(() => {
     if (ms > 0 && ms <= 5*60000 && !reminded.has(it.id)){
       reminded.add(it.id);
       const joins = it.votes.filter(v => v.choice === "join").map(v => v.who).join(", ");
-      notify("⏰ La spedizione parte tra 5 minuti!",
+      const min = Math.ceil(ms / 60000);
+      notify("⏰ La spedizione parte tra " + min + (min === 1 ? " minuto!" : " minuti!"),
         it.from + " → " + it.to + (joins ? " — a bordo: " + joins : " — nessuno a bordo"),
         () => focusCard(t.id, it.id));
       const card = document.querySelector('.card[data-id="' + it.id + '"]');
@@ -874,6 +929,8 @@ setTimeout(() => { if ("Notification" in window && Notification.permission === "
 (async () => {
   try {
     const r = await fetch("/api/state"); applyState(await r.json(), false);
+    const q = new URLSearchParams(location.search);
+    if (q.get("t")) { focusCard(q.get("t"), q.get("i")); history.replaceState(null, "", "/"); }
   } catch(e) {
     $("stream").innerHTML = '<div class="empty"><div class="ic">⚠️</div><div class="etxt">Impossibile contattare il server.<br>Controlla la connessione e ricarica la pagina.</div></div>';
   }
