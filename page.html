@@ -7,7 +7,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Ponte Logistico — Campionario ⇄ Produzione</title>
+<title>Ponte Logistico — Campionario · Produzione · Spedizioni</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%9A%9A%3C/text%3E%3C/svg%3E">
 <style>
   :root{
@@ -17,7 +17,7 @@
     --acc:#4da8ff; --acc-dim:rgba(77,168,255,.15);
     --ok:#34d399; --ok-dim:rgba(52,211,153,.14);
     --no:#f87171; --no-dim:rgba(248,113,113,.13);
-    --camp:#b18aff; --prod:#ffb454;
+    --camp:#b18aff; --prod:#ffb454; --sped:#f472b6;
     --r-sm:8px; --r-md:12px; --r-lg:16px;
     --shadow-1:0 1px 2px rgba(0,0,0,.35);
     --shadow-2:0 16px 40px rgba(0,0,0,.45);
@@ -147,6 +147,7 @@
   .chip{font-size:10.5px;font-weight:800;padding:3px 10px;border-radius:20px;letter-spacing:.2px}
   .chip.camp{background:rgba(177,138,255,.15);color:var(--camp)}
   .chip.prod{background:rgba(255,180,84,.15);color:var(--prod)}
+  .chip.sped{background:rgba(244,114,182,.15);color:var(--sped)}
   .card .time{margin-left:auto;font-size:11.5px;font-weight:700;color:var(--txt);
     background:var(--panel2);border:1px solid var(--line);border-radius:20px;padding:3px 10px;
     font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -232,7 +233,7 @@
   .login{position:fixed;inset:0;background:var(--bg);z-index:200;display:none;
     align-items:center;justify-content:center;padding:24px;overflow-y:auto}
   .login.on{display:flex}
-  .login-card{width:100%;max-width:520px;background:var(--panel);border:1px solid var(--line);
+  .login-card{width:100%;max-width:640px;background:var(--panel);border:1px solid var(--line);
     border-radius:var(--r-lg);padding:28px 26px;box-shadow:var(--shadow-2);margin:auto}
   .login-head{display:flex;align-items:center;gap:13px;margin-bottom:6px}
   .login-head .logo{width:44px;height:44px;border-radius:13px;background:linear-gradient(135deg,var(--acc),#2b7ddb);
@@ -240,17 +241,19 @@
   .login-head h2{font-size:18px;font-weight:800}
   .login-head p{font-size:12px;color:var(--muted);margin-top:2px}
   .login-card > p.ask{font-size:13.5px;color:var(--muted);margin:16px 0 18px;line-height:1.5}
-  .rep-choice{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
+  .rep-choice{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px}
   .rep-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;
     padding:26px 16px 22px;border-radius:var(--r-lg);border:1.5px solid var(--line);background:var(--panel2);
     color:var(--txt);cursor:pointer;transition:.12s;text-align:center;font-family:inherit}
   .rep-btn .ic{font-size:38px;line-height:1}
   .rep-btn .nm{display:block;font-size:17px;font-weight:800}
-  .rep-btn .ds{display:block;font-size:11.5px;color:var(--muted);line-height:1.45;max-width:190px;margin:6px auto 0}
+  .rep-btn .ds{display:block;font-size:11.5px;color:var(--muted);line-height:1.45;max-width:170px;margin:6px auto 0}
   .rep-btn.camp .nm{color:var(--camp)}
   .rep-btn.prod .nm{color:var(--prod)}
+  .rep-btn.sped .nm{color:var(--sped)}
   .rep-btn.camp:hover,.rep-btn.camp.sel{border-color:var(--camp);background:rgba(177,138,255,.1)}
   .rep-btn.prod:hover,.rep-btn.prod.sel{border-color:var(--prod);background:rgba(255,180,84,.1)}
+  .rep-btn.sped:hover,.rep-btn.sped.sel{border-color:var(--sped);background:rgba(244,114,182,.1)}
   .rep-btn:active{transform:scale(.98)}
   .login-card .foot{font-size:11.5px;color:var(--faint);line-height:1.6;border-top:1px solid var(--line);
     padding-top:14px;margin-top:4px}
@@ -267,6 +270,7 @@
     justify-content:center;font-size:14px;font-weight:900;flex-shrink:0;letter-spacing:-.2px}
   .whochip.camp .av{background:var(--camp);color:#160b2c}
   .whochip.prod .av{background:var(--prod);color:#2c1600}
+  .whochip.sped .av{background:var(--sped);color:#2c0717}
   .whochip .nm{display:block;font-size:13px;font-weight:700;line-height:1.25}
   .whochip .rp{display:block;font-size:10.5px;color:var(--muted);line-height:1.2;margin-top:1px}
   .whochip .caret{font-size:9px;color:var(--muted);margin-left:2px}
@@ -291,14 +295,14 @@
     .login-card{padding:22px 18px}
   }
   @media (max-width: 620px){
-    .whochip .rp{display:none}
-    .whochip{padding:5px 9px 5px 5px}
-  }
-  @media (max-width: 480px){
     .rep-choice{grid-template-columns:1fr}
     .rep-btn{flex-direction:row;justify-content:flex-start;text-align:left;padding:16px;gap:14px}
     .rep-btn .ic{font-size:30px}
     .rep-btn .ds{margin:4px 0 0;max-width:none}
+    .whochip .rp{display:none}
+    .whochip{padding:5px 9px 5px 5px}
+  }
+  @media (max-width: 480px){
     .row-buttons{grid-template-columns:1fr 1fr}
     .row-buttons .b-ship{grid-column:1 / -1}
     .votebox{grid-template-columns:1fr}
@@ -323,7 +327,7 @@
       <div class="logo">🚚</div>
       <div>
         <h2>Ponte Logistico</h2>
-        <p>Campionario ⇄ Produzione</p>
+        <p>Campionario · Produzione · Spedizioni</p>
       </div>
     </div>
     <p class="ask">Da quale reparto usi l'app? Sceglilo una volta sola: resta salvato su questo computer.</p>
@@ -331,12 +335,17 @@
       <button type="button" class="rep-btn camp" data-rep="Campionario">
         <span class="ic">🏷️</span>
         <span><span class="nm">Campionario</span>
-        <span class="ds">Ricevi gli avvisi delle spedizioni della Produzione</span></span>
+        <span class="ds">Ricevi gli avvisi di Produzione e Spedizioni</span></span>
       </button>
       <button type="button" class="rep-btn prod" data-rep="Produzione">
         <span class="ic">🏭</span>
         <span><span class="nm">Produzione</span>
-        <span class="ds">Ricevi gli avvisi delle spedizioni del Campionario</span></span>
+        <span class="ds">Ricevi gli avvisi di Campionario e Spedizioni</span></span>
+      </button>
+      <button type="button" class="rep-btn sped" data-rep="Spedizioni">
+        <span class="ic">📦</span>
+        <span><span class="nm">Spedizioni</span>
+        <span class="ds">Ricevi gli avvisi di Campionario e Produzione</span></span>
       </button>
     </div>
     <div class="foot">Puoi cambiare reparto quando vuoi cliccando sul nome del reparto in alto a destra.</div>
@@ -351,7 +360,7 @@
     <div class="logo">🚚</div>
     <div style="flex:1;min-width:0">
       <h1>Ponte Logistico</h1>
-      <p>Campionario ⇄ Produzione</p>
+      <p>Campionario · Produzione · Spedizioni</p>
       <div class="live" id="live"><span class="led"></span><span id="liveTxt">connessione…</span></div>
     </div>
     <button class="close-drawer" id="btnCloseDrawer" aria-label="Chiudi menu">✕</button>
@@ -397,7 +406,7 @@
 <div class="modal-bg" id="modalBg">
   <div class="modal">
     <h3>🚚 Nuova spedizione in partenza</h3>
-    <p class="sub">Compila i dettagli: verrà notificata subito all'altro reparto.</p>
+    <p class="sub">Compila i dettagli: verrà notificata subito agli altri reparti.</p>
     <label>Partenza</label>
     <input id="fFrom" placeholder="es. Magazzino Campionario — Capannone B">
     <label>Destinazione / negozio</label>
@@ -445,7 +454,14 @@
    Ponte Logistico — client
    ========================================================= */
 /* Si sceglie solo il reparto: è anche il "nome" con cui si pubblica e si risponde. */
-const REPARTI = ["Campionario", "Produzione"];
+const REPARTI = ["Campionario", "Produzione", "Spedizioni"];
+/* stile, icona e partenza proposta per ogni reparto */
+const REP_INFO = {
+  Campionario: { cls: "camp", ic: "🏷️", partenza: "Magazzino Campionario" },
+  Produzione:  { cls: "prod", ic: "🏭", partenza: "Reparto Produzione" },
+  Spedizioni:  { cls: "sped", ic: "📦", partenza: "Reparto Spedizioni" },
+};
+const repCls = r => (REP_INFO[r] || REP_INFO.Campionario).cls;
 function repValido(r){ return REPARTI.indexOf(r) !== -1 ? r : ""; }
 
 let DB = { tratte: [], seq: 1 };
@@ -624,8 +640,8 @@ function apriLogin(switching){
 }
 function renderMe(){
   const chip = $("whoChip");
-  chip.className = "whochip " + (REP === "Produzione" ? "prod" : "camp");
-  $("whoAv").textContent = REP === "Produzione" ? "🏭" : REP ? "🏷️" : "?";
+  chip.className = "whochip " + repCls(REP);
+  $("whoAv").textContent = REP ? REP_INFO[REP].ic : "?";
   $("whoNm").textContent = REP || "Scegli reparto";
   $("whoRp").textContent = REP ? "cambia reparto" : "—";
 }
@@ -682,7 +698,7 @@ function renderStream(){
   }
   t.items.forEach(item => {
     const rep = item.rep || item.fromRep || "";
-    const repCls = rep === "Produzione" ? "prod" : "camp";
+    const cls = repCls(rep);
     const joins = item.votes.filter(v => v.choice === "join");
     const skips = item.votes.filter(v => v.choice === "skip");
     const mine = item.votes.find(v => v.who === ME);
@@ -692,7 +708,7 @@ function renderStream(){
     card.innerHTML = `
       <button class="delitem" title="Elimina spedizione" aria-label="Elimina spedizione">&times;</button>
       <div class="top">
-        <span class="chip ${repCls}">${esc((rep || "—").toUpperCase())}</span>
+        <span class="chip ${cls}">${esc((rep || "—").toUpperCase())}</span>
         <span class="time">🕒 ${esc(item.when||"—")}</span>
       </div>
       <div class="route">🚚 ${esc(item.from)} <span style="color:var(--muted)">→</span> ${esc(item.to)}</div>
@@ -791,7 +807,7 @@ async function refresh(trattaId, itemId){
 $("bShip").onclick = () => {
   if (!ME) { apriLogin(false); return; }
   $("modalBg").classList.add("on");
-  $("fFrom").value = REP === "Produzione" ? "Reparto Produzione" : "Magazzino Campionario";
+  $("fFrom").value = (REP_INFO[REP] || REP_INFO.Campionario).partenza;
   $("fTo").value = ""; $("fWhen").value = ""; $("fNote").value = "";
   setTimeout(() => $("fFrom").focus(), 50);
 };
