@@ -1,12 +1,13 @@
 /* ============================================================
-   PONTE LOGISTICO — Server per Render (due PC)
-   Chat condivisa Campionario ⇄ Produzione.
+   PONTE LOGISTICO — Server per Render
+   Coordinamento spedizioni tra Campionario, Produzione e Spedizioni.
    Tre comandi: Spedizione in partenza / Mi unisco / Non mi unisco.
    ============================================================ */
 
 const express = require("express");
 const path = require("path");
 const fs = require("fs");
+const crypto = require("crypto");
 const webpush = require("web-push");
 
 const app = express();
@@ -34,6 +35,43 @@ app.use(function(req, res, next){
   if (req.path.indexOf("/api/") === 0) return res.json({ error: "Ponte Logistico si usa solo da computer." });
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.send(PAGINA_TELEFONO);
+});
+
+/* ---------- Codice d'accesso aziendale ----------
+   Il codice si imposta su Render → Environment → ACCESS_CODE. Chi lo inserisce riceve un cookie
+   valido un anno su quel computer. Cambiando il codice su Render, tutti devono reinserirlo. */
+function normalizzaCodice(c){ return String(c || "").toUpperCase().replace(/[\s-]/g, ""); }
+const ACCESS_CODE = normalizzaCodice(process.env.ACCESS_CODE);
+const TOKEN_ACCESSO = ACCESS_CODE
+  ? crypto.createHmac("sha256", ACCESS_CODE).update("ponte-logistico-accesso").digest("base64url") : "";
+if (!ACCESS_CODE) console.warn("ATTENZIONE: ACCESS_CODE non impostato: l'app è aperta a chiunque abbia il link.");
+function uguali(a, b){
+  const A = Buffer.from(String(a)), B = Buffer.from(String(b));
+  return A.length === B.length && crypto.timingSafeEqual(A, B);
+}
+function cookie(req, nome){
+  const m = ("; " + (req.headers.cookie || "")).match(new RegExp("; " + nome + "=([^;]*)"));
+  return m ? m[1] : "";
+}
+function autorizzato(req){ return !ACCESS_CODE || uguali(cookie(req, "pl_accesso"), TOKEN_ACCESSO); }
+
+/* al massimo 10 codici sbagliati al minuto (in totale, senza guardare da dove arrivano) */
+let tentativi = { minuto: 0, sbagliati: 0 };
+app.post("/api/login", function(req, res){
+  if (!ACCESS_CODE) return res.json({ ok: true });
+  const minuto = Math.floor(Date.now() / 60000);
+  if (tentativi.minuto !== minuto) tentativi = { minuto: minuto, sbagliati: 0 };
+  if (tentativi.sbagliati >= 10) return res.status(429).json({ error: "Troppi tentativi sbagliati: riprova tra un minuto." });
+  if (!uguali(normalizzaCodice(req.body && req.body.code), ACCESS_CODE)) {
+    tentativi.sbagliati++;
+    return setTimeout(function(){ res.status(401).json({ error: "Codice non valido." }); }, 700);
+  }
+  res.setHeader("Set-Cookie", "pl_accesso=" + TOKEN_ACCESSO + "; Path=/; Max-Age=31536000; HttpOnly; SameSite=Strict; Secure");
+  res.json({ ok: true });
+});
+app.use(function(req, res, next){
+  if (req.path.indexOf("/api/") !== 0 || req.path === "/api/login" || autorizzato(req)) return next();
+  res.status(401).json({ error: "codice" });
 });
 
 /* ---------- Stato condiviso ---------- */
@@ -212,6 +250,25 @@ function controllaPromemoria(){
   if (cambiato) persist();
 }
 setInterval(controllaPromemoria, 15000);
+
+/* ---------- Conservazione: le spedizioni si cancellano da sole dopo 30 giorni ---------- */
+const GIORNI_CONSERVAZIONE = Number(process.env.RETENTION_DAYS) || 30;
+function pulizia(){
+  const limite = Date.now() - GIORNI_CONSERVAZIONE * 24 * 3600 * 1000;
+  let tolte = 0;
+  DB.tratte.forEach(function(t){
+    const prima = t.items.length;
+    t.items = t.items.filter(function(it){ return (it.ts || 0) >= limite; });
+    tolte += prima - t.items.length;
+  });
+  if (tolte) {
+    persist();
+    broadcast("tratta", {});
+    console.log("Pulizia: eliminate " + tolte + " spedizioni più vecchie di " + GIORNI_CONSERVAZIONE + " giorni");
+  }
+}
+pulizia();
+setInterval(pulizia, 3600 * 1000);
 
 /* ---------- Sveglia per cron-job.org: tiene acceso il server gratuito di Render ----------
    Ogni visita scrive una riga nei Logs di Render, così si vede che il cron funziona. */

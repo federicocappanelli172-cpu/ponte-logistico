@@ -261,6 +261,15 @@
     border:1px solid var(--line);border-radius:var(--r-sm);padding:11px;font-size:13px;
     font-weight:650;cursor:pointer;display:none}
   .login.switching #loginCancel{display:block}
+  #codice{z-index:250}
+  .codice-row{display:flex;gap:10px}
+  .codice-row input{flex:1;min-width:0;background:var(--bg);border:1px solid var(--line);border-radius:var(--r-sm);
+    padding:13px 14px;color:var(--txt);font-size:17px;letter-spacing:2px;outline:none;font-variant-numeric:tabular-nums}
+  .codice-row input:focus{border-color:var(--acc)}
+  .codice-row button{border:none;border-radius:var(--r-sm);padding:0 22px;background:var(--acc);color:#04121f;
+    font-size:14px;font-weight:750;cursor:pointer}
+  .codice-row button:disabled{opacity:.5;cursor:wait}
+  .codice-err{color:var(--no);font-size:12.5px;margin-top:10px;min-height:1.3em}
 
   /* ---------- chip operatore in header ---------- */
   .whochip{display:flex;align-items:center;gap:9px;background:var(--panel2);border:1px solid var(--line);
@@ -320,6 +329,25 @@
 </style>
 </head>
 <body>
+
+<div class="login" id="codice">
+  <div class="login-card">
+    <div class="login-head">
+      <div class="logo">🚚</div>
+      <div>
+        <h2>Ponte Logistico</h2>
+        <p>Campionario · Produzione · Spedizioni</p>
+      </div>
+    </div>
+    <p class="ask">🔒 Inserisci il <b style="color:var(--txt)">codice d'accesso</b> dell'azienda. Si inserisce una volta sola su questo computer.</p>
+    <div class="codice-row">
+      <input id="fCodice" type="text" autocomplete="off" spellcheck="false" placeholder="es. 1234-5678" aria-label="Codice d'accesso">
+      <button id="codiceOk" type="button">Entra</button>
+    </div>
+    <div class="codice-err" id="codiceErr"></div>
+    <div class="foot">Non conosci il codice? Chiedilo al responsabile di Ponte Logistico.</div>
+  </div>
+</div>
 
 <div class="login" id="login">
   <div class="login-card">
@@ -416,6 +444,7 @@
     <div style="font-size:11px;color:var(--muted);margin:-8px 0 14px 2px">Da quest'ora parte il timer e l'avviso 5 minuti prima.</div>
     <label>Note (opzionale)</label>
     <textarea id="fNote" rows="2" placeholder="es. mezzo 3/4 carico, 2 posti liberi"></textarea>
+    <div style="font-size:11px;color:var(--muted);margin:-8px 0 14px 2px">Non inserire dati personali (nomi, numeri di telefono, motivi di salute).</div>
     <div class="act">
       <button class="cancel" id="mCancel">Annulla</button>
       <button class="ok" id="mOk">Pubblica spedizione</button>
@@ -755,10 +784,42 @@ function focusCard(trattaId, itemId){
     setTimeout(() => c.classList.remove("flash"), 2500); }
 }
 
+/* ---------- codice d'accesso ---------- */
+let codiceInCorso = null;
+function serveCodice(){
+  if (codiceInCorso) return codiceInCorso;
+  codiceInCorso = new Promise(() => {
+    $("codice").classList.add("on");
+    const invia = async () => {
+      const code = $("fCodice").value.trim();
+      if (!code) return;
+      $("codiceOk").disabled = true; $("codiceErr").textContent = "";
+      try {
+        const r = await fetch("/api/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code }) });
+        const j = await r.json().catch(() => ({}));
+        if (r.ok && j.ok) { location.reload(); return; }
+        $("codiceErr").textContent = j.error || "Codice non valido.";
+      } catch (e) { $("codiceErr").textContent = "Impossibile contattare il server. Riprova."; }
+      $("codiceOk").disabled = false; $("fCodice").select();
+    };
+    $("codiceOk").onclick = invia;
+    $("fCodice").onkeydown = e => { if (e.key === "Enter") invia(); };
+    setTimeout(() => $("fCodice").focus(), 50);
+  });
+  return codiceInCorso;
+}
+/* legge lo stato; se serve il codice mostra la schermata e restituisce null */
+async function leggiStato(){
+  const r = await fetch("/api/state");
+  if (r.status === 401) { serveCodice(); return null; }
+  return r.json();
+}
+
 /* ---------- API ---------- */
 async function rpc(url, body){
   try {
     const r = await fetch(url, { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify(body) });
+    if (r.status === 401) { serveCodice(); return { error: "codice" }; }
     const j = await r.json();
     if (j.state) applyState(j.state, false);
     if (j.error) notify("Errore", j.error, null, false);
@@ -816,7 +877,7 @@ function connect(){
 }
 async function refresh(trattaId, itemId){
   try {
-    const r = await fetch("/api/state"); applyState(await r.json(), true);
+    const s = await leggiStato(); if (!s) return; applyState(s, true);
     if (trattaId && itemId && cur() && cur().id === trattaId) focusCard(trattaId, itemId);
   } catch(e){}
 }
@@ -941,14 +1002,16 @@ setTimeout(() => { if ("Notification" in window && Notification.permission === "
 
 (async () => {
   try {
-    const r = await fetch("/api/state"); applyState(await r.json(), false);
+    const s = await leggiStato();
+    if (!s) return; /* prima serve il codice d'accesso: dopo, la pagina si ricarica */
+    applyState(s, false);
     const q = new URLSearchParams(location.search);
     if (q.get("t")) { focusCard(q.get("t"), q.get("i")); history.replaceState(null, "", "/"); }
   } catch(e) {
     $("stream").innerHTML = '<div class="empty"><div class="ic">⚠️</div><div class="etxt">Impossibile contattare il server.<br>Controlla la connessione e ricarica la pagina.</div></div>';
   }
   connect();
-  setInterval(async () => { try { const s = await (await fetch("/api/state")).json(); applyState(s, true); } catch(e){} }, 60000);
+  setInterval(async () => { try { const s = await leggiStato(); if (s) applyState(s, true); } catch(e){} }, 60000);
 })();
 </script>
 </body>
