@@ -1,6 +1,6 @@
 /* ============================================================
    PONTE LOGISTICO — Server per Render
-   Coordinamento spedizioni tra Campionario, Produzione e Spedizioni.
+   Coordinamento spedizioni tra Campionario e Produzione.
    Tre comandi: Spedizione in partenza / Mi unisco / Non mi unisco.
    ============================================================ */
 
@@ -134,9 +134,14 @@ app.get("/api/stream", function(req, res){
   res.write("retry: 3000\n\n");
   res.write("event: hello\ndata: " + JSON.stringify({ ok: true }) + "\n\n");
   clients.add(res);
+  annunciaCollegati();
   const ping = setInterval(function(){ try { res.write(": ping\n\n"); } catch (e) {} }, 20000);
-  req.on("close", function(){ clearInterval(ping); clients.delete(res); });
+  req.on("close", function(){ clearInterval(ping); clients.delete(res); annunciaCollegati(); });
 });
+
+/* quanti computer hanno l'app aperta in questo momento: solo il numero totale,
+   senza sapere quali, di quale reparto o di chi; non viene mai registrato */
+function annunciaCollegati(){ broadcast("collegati", { n: clients.size }); }
 
 function broadcast(event, payload){
   const frame = "event: " + event + "\ndata: " + JSON.stringify(payload) + "\n\n";

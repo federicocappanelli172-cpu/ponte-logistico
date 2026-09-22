@@ -865,6 +865,12 @@ let reconnectTimer = null;
 function connect(){
   const es = new EventSource("/api/stream");
   es.addEventListener("hello", () => { $("live").classList.add("on"); $("liveTxt").textContent = "online · sincronizzato"; attivaPush(); });
+  /* numero totale di computer con l'app aperta (non dice quali né di chi) */
+  es.addEventListener("collegati", e => {
+    const n = Number(JSON.parse(e.data).n) || 0;
+    $("live").classList.add("on");
+    $("liveTxt").textContent = "online · " + n + (n === 1 ? " computer collegato" : " computer collegati");
+  });
   es.addEventListener("ship", e => { const d = JSON.parse(e.data); refresh(d.trattaId, d.item.id); });
   es.addEventListener("vote", () => refresh());
   es.addEventListener("tratta", () => refresh());
