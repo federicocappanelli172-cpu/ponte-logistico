@@ -7,7 +7,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>Ponte Logistico — Campionario · Produzione · Spedizioni</title>
+<title>Ponte Logistico — Campionario ⇄ Produzione</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%9A%9A%3C/text%3E%3C/svg%3E">
 <style>
   :root{
@@ -233,7 +233,7 @@
   .login{position:fixed;inset:0;background:var(--bg);z-index:200;display:none;
     align-items:center;justify-content:center;padding:24px;overflow-y:auto}
   .login.on{display:flex}
-  .login-card{width:100%;max-width:640px;background:var(--panel);border:1px solid var(--line);
+  .login-card{width:100%;max-width:560px;background:var(--panel);border:1px solid var(--line);
     border-radius:var(--r-lg);padding:28px 26px;box-shadow:var(--shadow-2);margin:auto}
   .login-head{display:flex;align-items:center;gap:13px;margin-bottom:6px}
   .login-head .logo{width:44px;height:44px;border-radius:13px;background:linear-gradient(135deg,var(--acc),#2b7ddb);
@@ -241,7 +241,7 @@
   .login-head h2{font-size:18px;font-weight:800}
   .login-head p{font-size:12px;color:var(--muted);margin-top:2px}
   .login-card > p.ask{font-size:13.5px;color:var(--muted);margin:16px 0 18px;line-height:1.5}
-  .rep-choice{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:18px}
+  .rep-choice{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-bottom:18px}
   .rep-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;
     padding:26px 16px 22px;border-radius:var(--r-lg);border:1.5px solid var(--line);background:var(--panel2);
     color:var(--txt);cursor:pointer;transition:.12s;text-align:center;font-family:inherit}
@@ -336,7 +336,7 @@
       <div class="logo">🚚</div>
       <div>
         <h2>Ponte Logistico</h2>
-        <p>Campionario · Produzione · Spedizioni</p>
+        <p>Campionario ⇄ Produzione</p>
       </div>
     </div>
     <p class="ask">🔒 Inserisci il <b style="color:var(--txt)">codice d'accesso</b> dell'azienda. Si inserisce una volta sola su questo computer.</p>
@@ -355,7 +355,7 @@
       <div class="logo">🚚</div>
       <div>
         <h2>Ponte Logistico</h2>
-        <p>Campionario · Produzione · Spedizioni</p>
+        <p>Campionario ⇄ Produzione</p>
       </div>
     </div>
     <p class="ask">Da quale reparto usi l'app? Sceglilo una volta sola: resta salvato su questo computer.</p>
@@ -363,17 +363,12 @@
       <button type="button" class="rep-btn camp" data-rep="Campionario">
         <span class="ic">🏷️</span>
         <span><span class="nm">Campionario</span>
-        <span class="ds">Ricevi gli avvisi di Produzione e Spedizioni</span></span>
+        <span class="ds">Ricevi gli avvisi della Produzione</span></span>
       </button>
       <button type="button" class="rep-btn prod" data-rep="Produzione">
         <span class="ic">🏭</span>
         <span><span class="nm">Produzione</span>
-        <span class="ds">Ricevi gli avvisi di Campionario e Spedizioni</span></span>
-      </button>
-      <button type="button" class="rep-btn sped" data-rep="Spedizioni">
-        <span class="ic">📦</span>
-        <span><span class="nm">Spedizioni</span>
-        <span class="ds">Ricevi gli avvisi di Campionario e Produzione</span></span>
+        <span class="ds">Ricevi gli avvisi del Campionario</span></span>
       </button>
     </div>
     <div class="foot">Puoi cambiare reparto quando vuoi cliccando sul nome del reparto in alto a destra.</div>
@@ -388,7 +383,7 @@
     <div class="logo">🚚</div>
     <div style="flex:1;min-width:0">
       <h1>Ponte Logistico</h1>
-      <p>Campionario · Produzione · Spedizioni</p>
+      <p>Campionario ⇄ Produzione</p>
       <div class="live" id="live"><span class="led"></span><span id="liveTxt">connessione…</span></div>
     </div>
     <button class="close-drawer" id="btnCloseDrawer" aria-label="Chiudi menu">✕</button>
@@ -434,7 +429,7 @@
 <div class="modal-bg" id="modalBg">
   <div class="modal">
     <h3>🚚 Nuova spedizione in partenza</h3>
-    <p class="sub">Compila i dettagli: verrà notificata subito agli altri reparti.</p>
+    <p class="sub">Compila i dettagli: verrà notificata subito all'altro reparto.</p>
     <label>Partenza</label>
     <input id="fFrom" placeholder="es. Magazzino Campionario — Capannone B">
     <label>Destinazione / negozio</label>
@@ -501,7 +496,7 @@ if (DA_TELEFONO) {
 }
 
 /* Si sceglie solo il reparto: è anche il "nome" con cui si pubblica e si risponde. */
-const REPARTI = ["Campionario", "Produzione", "Spedizioni"];
+const REPARTI = ["Campionario", "Produzione"];
 /* stile, icona e partenza proposta per ogni reparto */
 const REP_INFO = {
   Campionario: { cls: "camp", ic: "🏷️", partenza: "Magazzino Campionario" },
