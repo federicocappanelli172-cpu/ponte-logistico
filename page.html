@@ -954,7 +954,8 @@ function extraHTML(item){
 function timerHTML(item){
   const ms = msToDepart(item);
   if (ms === null) return "";
-  if (ms < -60*60000) return '<div class="timer gone"><span class="big">✅</span><span class="lbl">SPEDIZIONE<br>PARTITA</span></div>';
+  /* passati 5 minuti dall'orario di partenza, la spedizione risulta partita e il riquadro smette di lampeggiare */
+  if (ms < -5*60000) return '<div class="timer gone"><span class="big">✅</span><span class="lbl">SPEDIZIONE<br>PARTITA</span></div>';
   if (ms <= 0) return '<div class="timer now"><span class="big">🚚</span><span class="lbl">IN PARTENZA<br>PROPRIO ORA</span></div>';
   const min = Math.floor(ms / 60000), sec = Math.floor((ms % 60000) / 1000);
   const cls = min < 5 ? "soon" : "wait";
