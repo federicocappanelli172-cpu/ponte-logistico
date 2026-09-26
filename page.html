@@ -479,9 +479,12 @@
    ========================================================= */
 /* Solo da computer: blocca i telefoni anche con "Richiedi sito desktop" attivo
    (schermo piccolo + touch). I tablet e i PC con schermo touch funzionano. */
-const DA_TELEFONO = /Mobi|iPhone|iPod|Android.+Mobile|Windows Phone|BlackBerry|BB10|Opera Mini|IEMobile/i.test(navigator.userAgent)
+/* Eccezione: il telefono del titolare, abilitato dal link /titolare/<chiave>.
+   Il segnale lo mette il server solo dopo aver verificato il cookie. */
+const DA_TELEFONO = !window.__TITOLARE__ && (
+  /Mobi|iPhone|iPod|Android.+Mobile|Windows Phone|BlackBerry|BB10|Opera Mini|IEMobile/i.test(navigator.userAgent)
   || !!(navigator.userAgentData && navigator.userAgentData.mobile)
-  || (navigator.maxTouchPoints > 0 && Math.min(screen.width, screen.height) < 600);
+  || (navigator.maxTouchPoints > 0 && Math.min(screen.width, screen.height) < 600));
 if (DA_TELEFONO) {
   document.title = "Ponte Logistico — solo da computer";
   document.body.innerHTML =

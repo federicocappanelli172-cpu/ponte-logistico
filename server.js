@@ -25,16 +25,80 @@ const PAGINA_TELEFONO = "<!doctype html><html lang=\"it\"><head><meta charset=\"
   "<h1 style=\"font-size:19px;margin:12px 0 8px\">Ponte Logistico si usa solo da computer</h1>" +
   "<p style=\"font-size:14px;color:#93a0b0;line-height:1.5;margin:0\">Apri <b style=\"color:#eef2f6\">ponte-logistico.onrender.com</b> " +
   "dal PC del tuo reparto.</p></div></body></html>";
+/* ---------- Link del titolare: sblocca l'app sul suo telefono ----------
+   La chiave si imposta su Render → Environment → OWNER_KEY, mai nel codice:
+   il repository è pubblico e chiunque potrebbe leggerla. Il titolare apre una volta
+       https://ponte-logistico.onrender.com/titolare/<OWNER_KEY>
+   e quel telefono resta abilitato per un anno. Cambiando OWNER_KEY su Render il
+   link vecchio smette di funzionare e i telefoni già abilitati vengono esclusi.
+   Come per gli altri telefoni, di questi accessi non si registra nulla. */
+const OWNER_KEY = String(process.env.OWNER_KEY || "").trim();
+const OWNER_ATTIVO = OWNER_KEY.length >= 16;
+if (OWNER_KEY && !OWNER_ATTIVO) console.warn("ATTENZIONE: OWNER_KEY troppo corta (servono almeno 16 caratteri): link del titolare disattivato.");
+const TOKEN_TITOLARE = OWNER_ATTIVO
+  ? crypto.createHmac("sha256", OWNER_KEY).update("ponte-logistico-titolare").digest("base64url") : "";
+function eTitolare(req){ return OWNER_ATTIVO && uguali(cookie(req, "pl_titolare"), TOKEN_TITOLARE); }
+
 /* Il tipo di dispositivo serve solo a decidere cosa mostrare: dei telefoni non si registra
    nulla (né IP, né dispositivo, né orario), in nessun file e in nessun log. */
 app.use(function(req, res, next){
-  res.setHeader("Vary", "User-Agent");
-  if (req.path === "/ping" || !RE_TELEFONO.test(req.headers["user-agent"] || "")) return next();
+  res.setHeader("Vary", "User-Agent, Cookie");
+  if (req.path === "/ping" || req.path.indexOf("/titolare/") === 0 || eTitolare(req)
+      || !RE_TELEFONO.test(req.headers["user-agent"] || "")) return next();
   res.statusCode = 403;
   res.setHeader("Cache-Control", "no-store");
   if (req.path.indexOf("/api/") === 0) return res.json({ error: "Ponte Logistico si usa solo da computer." });
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.send(PAGINA_TELEFONO);
+});
+
+/* pagina di conferma: poi entra nell'app togliendo il link dalla cronologia */
+function paginaTitolare(icona, titolo, testo){
+  return "<!doctype html><html lang=\"it\"><head><meta charset=\"utf-8\">" +
+    "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><meta name=\"referrer\" content=\"no-referrer\">" +
+    "<title>Ponte Logistico</title></head>" +
+    "<body style=\"margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0b0d10;" +
+    "color:#eef2f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;padding:24px;box-sizing:border-box\">" +
+    "<div style=\"max-width:360px;text-align:center;background:#14171c;border:1px solid #272d38;border-radius:16px;padding:28px 22px\">" +
+    "<div style=\"font-size:44px\">" + icona + "</div>" +
+    "<h1 style=\"font-size:19px;margin:12px 0 8px\">" + titolo + "</h1>" +
+    "<p style=\"font-size:14px;color:#93a0b0;line-height:1.5;margin:0 0 18px\">" + testo + "</p>" +
+    "<a href=\"/\" onclick=\"location.replace('/');return false\" style=\"display:inline-block;background:#4da8ff;color:#04121f;" +
+    "font-weight:700;text-decoration:none;border-radius:10px;padding:12px 20px\">Apri Ponte Logistico</a></div>" +
+    "<script>setTimeout(function(){ location.replace('/'); }, 1500);</script></body></html>";
+}
+function inviaPaginaTitolare(res, html){
+  res.statusCode = 200;
+  res.setHeader("Cache-Control", "no-store");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.end(html);
+}
+
+/* disabilita il telefono del titolare (per vedere cosa vedono gli altri, o se lo presta) */
+app.get("/titolare/esci", function(req, res){
+  res.setHeader("Set-Cookie", "pl_titolare=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax; Secure");
+  inviaPaginaTitolare(res, paginaTitolare("👋", "Telefono del titolare disattivato",
+    "Da questo telefono l'app torna a mostrare l'avviso \"solo da computer\", come per tutti."));
+});
+
+app.get("/titolare/:chiave", function(req, res){
+  let chiave = "";
+  try { chiave = decodeURIComponent(req.path.slice("/titolare/".length)); } catch (e) {}
+  /* chiave sbagliata: nessun indizio, si torna alla pagina normale (con un attimo di attesa) */
+  if (!OWNER_ATTIVO || !uguali(chiave, OWNER_KEY)) {
+    return setTimeout(function(){
+      res.statusCode = 302; res.setHeader("Location", "/"); res.setHeader("Cache-Control", "no-store"); res.end();
+    }, 700);
+  }
+  /* SameSite=Lax (non Strict): il link arriva spesso da WhatsApp o dalla mail, e con Strict
+     il cookie non verrebbe inviato al primo caricamento dopo il clic */
+  const cookies = ["pl_titolare=" + TOKEN_TITOLARE + "; Path=/; Max-Age=31536000; HttpOnly; SameSite=Lax; Secure"];
+  /* il titolare salta anche il codice d'accesso aziendale */
+  if (ACCESS_CODE) cookies.push("pl_accesso=" + TOKEN_ACCESSO + "; Path=/; Max-Age=31536000; HttpOnly; SameSite=Strict; Secure");
+  res.setHeader("Set-Cookie", cookies);
+  inviaPaginaTitolare(res, paginaTitolare("✅", "Telefono del titolare abilitato",
+    "Da questo telefono puoi usare Ponte Logistico per un anno. Per gli altri resta \"solo da computer\"."));
 });
 
 /* ---------- Codice d'accesso aziendale ----------
@@ -396,10 +460,14 @@ function caricaPagina(){
   }
 }
 caricaPagina();
+/* versione per il telefono del titolare: la pagina ha un suo controllo "solo da
+   computer", e questo segnale le dice di saltarlo (la verifica vera resta nel server) */
+const PAGE_TITOLARE = PAGE.replace("</head>", "<script>window.__TITOLARE__=true;</script></head>");
 
 app.get("*", function(req, res){
   res.setHeader("Content-Type", "text/html; charset=utf-8");
-  res.send(PAGE);
+  res.setHeader("Cache-Control", "no-cache");
+  res.send(eTitolare(req) ? PAGE_TITOLARE : PAGE);
 });
 
 app.listen(PORT, "0.0.0.0", function(){
