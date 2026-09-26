@@ -131,7 +131,10 @@ app.get("/api/stream", function(req, res){
     "Cache-Control": "no-cache, no-transform",
     "Connection": "keep-alive",
   });
-  res.write("retry: 3000\n\n");
+  /* Quanto aspetta il browser prima di riconnettersi da solo, se la pagina
+     caricata è una versione vecchia rimasta in cache. Tenerlo a 3 secondi
+     generava raffiche di richieste e faceva scattare l'errore 429. */
+  res.write("retry: 15000\n\n");
   res.write("event: hello\ndata: " + JSON.stringify({ ok: true }) + "\n\n");
   clients.add(res);
   annunciaCollegati();

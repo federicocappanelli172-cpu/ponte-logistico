@@ -860,21 +860,52 @@ function applyState(next, doNotify){
   renderAll();
 }
 
-/* ---------- SSE ---------- */
-let reconnectTimer = null;
+/* ---------- SSE ----------
+   EventSource, lasciato a sé, si riconnette ogni pochi secondi all'infinito:
+   ogni scheda aperta arrivava a bussare oltre mille volte l'ora e Render
+   rispondeva 429 (Too Many Requests) a tutti, ping del cron compreso.
+   Qui la riconnessione la gestiamo noi, con attese che raddoppiano.
+   Lo stream NON viene chiuso a scheda nascosta: è da lì che devono arrivare
+   gli avvisi mentre si lavora ad altro. */
+let ES = null, retryMs = 3000, retryTimer = null, apertaAlle = 0, pushAttivata = false;
+
+function chiudiStream(){
+  if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
+  if (ES) { try { ES.close(); } catch(e){} ES = null; }
+}
 function connect(){
-  const es = new EventSource("/api/stream");
-  es.addEventListener("hello", () => { $("live").classList.add("on"); $("liveTxt").textContent = "online · sincronizzato"; attivaPush(); });
+  chiudiStream();
+  apertaAlle = Date.now();
+  ES = new EventSource("/api/stream");
+  ES.addEventListener("hello", () => {
+    $("live").classList.add("on"); $("liveTxt").textContent = "online · sincronizzato";
+    /* una volta sola: prima ripartiva a ogni riconnessione, aggiungendo due
+       richieste per ciclo proprio mentre il server era già sotto pressione */
+    if (!pushAttivata) { pushAttivata = true; attivaPush(); }
+  });
   /* numero totale di computer con l'app aperta (non dice quali né di chi) */
-  es.addEventListener("collegati", e => {
+  ES.addEventListener("collegati", e => {
     const n = Number(JSON.parse(e.data).n) || 0;
     $("live").classList.add("on");
     $("liveTxt").textContent = "online · " + n + (n === 1 ? " computer collegato" : " computer collegati");
   });
-  es.addEventListener("ship", e => { const d = JSON.parse(e.data); refresh(d.trattaId, d.item.id); });
-  es.addEventListener("vote", () => refresh());
-  es.addEventListener("tratta", () => refresh());
-  es.onerror = () => { $("live").classList.remove("on"); $("liveTxt").textContent = "riconnessione…"; };
+  ES.addEventListener("ship", e => { const d = JSON.parse(e.data); refresh(d.trattaId, d.item.id); });
+  ES.addEventListener("vote", () => refresh());
+  ES.addEventListener("tratta", () => refresh());
+  ES.onerror = () => {
+    /* L'attesa riparte da capo solo se lo stream era rimasto vivo a lungo:
+       una connessione che cade subito è un fallimento, e insistere ogni
+       3 secondi è proprio ciò che fa scattare il blocco del server. */
+    if (Date.now() - apertaAlle > 30000) retryMs = 3000;
+    $("live").classList.remove("on");
+    $("liveTxt").textContent = "riconnessione tra " + Math.round(retryMs/1000) + "s";
+    if (ES) { try { ES.close(); } catch(e){} ES = null; }
+    if (retryTimer) clearTimeout(retryTimer);
+    retryTimer = setTimeout(connect, retryMs);
+    /* 3s, 6s, 12s… fino a 1 minuto a schermo acceso; a scheda nascosta si
+       arriva fino a 5 minuti, così un computer lasciato acceso non insiste. */
+    retryMs = Math.min(retryMs * 2, document.hidden ? 300000 : 60000);
+  };
 }
 async function refresh(trattaId, itemId){
   try {
@@ -926,7 +957,14 @@ document.addEventListener("keydown", e => {
     if ($("aside").classList.contains("open")) closeDrawer();
   }
 });
-document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
+/* Tornando in primo piano: riallinea subito e, se lo stream era caduto,
+   lo riapre senza aspettare la fine dell'attesa in corso. */
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) return;
+  retryMs = 3000;
+  refresh();
+  if (!ES) connect();
+});
 
 let ORA_SERVER = 0;
 let DEPART_AT = {};
@@ -1013,7 +1051,15 @@ setTimeout(() => { if ("Notification" in window && Notification.permission === "
     $("stream").innerHTML = '<div class="empty"><div class="ic">⚠️</div><div class="etxt">Impossibile contattare il server.<br>Controlla la connessione e ricarica la pagina.</div></div>';
   }
   connect();
-  setInterval(async () => { try { const s = await leggiStato(); if (s) applyState(s, true); } catch(e){} }, 60000);
+  /* Rete di sicurezza se lo stream muore in silenzio: ogni 2 minuti a scheda
+     aperta, ogni 6 quando è nascosta. Prima era ogni minuto, sempre. */
+  let ultimoCheck = Date.now();
+  setInterval(async () => {
+    const atteso = document.hidden ? 360000 : 120000;
+    if (Date.now() - ultimoCheck < atteso) return;
+    ultimoCheck = Date.now();
+    try { const s = await leggiStato(); if (s) applyState(s, true); } catch(e){}
+  }, 30000);
 })();
 </script>
 </body>
