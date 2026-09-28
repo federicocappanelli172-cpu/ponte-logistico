@@ -11,6 +11,10 @@ const crypto = require("crypto");
 const webpush = require("web-push");
 
 const app = express();
+/* Identifica questo avvio del server. Su Render gratuito il disco si svuota a ogni
+   riavvio (sospensione notturna, nuovo deploy): con lui spariscono anche le iscrizioni
+   push salvate su file, e le pagine rimaste aperte devono sapere che vanno rifatte. */
+const AVVIO = crypto.randomBytes(6).toString("hex");
 const PORT = Number(process.env.PORT) || 3000;
 app.use(express.json({ limit: "2mb" }));
 
@@ -199,7 +203,9 @@ app.get("/api/stream", function(req, res){
      caricata è una versione vecchia rimasta in cache. Tenerlo a 3 secondi
      generava raffiche di richieste e faceva scattare l'errore 429. */
   res.write("retry: 15000\n\n");
-  res.write("event: hello\ndata: " + JSON.stringify({ ok: true }) + "\n\n");
+  /* "avvio" cambia a ogni riavvio del server: le pagine aperte lo usano per
+     capire che il server ha perso l'elenco delle iscrizioni push e reiscriversi */
+  res.write("event: hello\ndata: " + JSON.stringify({ ok: true, avvio: AVVIO }) + "\n\n");
   clients.add(res);
   annunciaCollegati();
   const ping = setInterval(function(){ try { res.write(": ping\n\n"); } catch (e) {} }, 20000);

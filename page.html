@@ -870,7 +870,7 @@ function applyState(next, doNotify){
    Qui la riconnessione la gestiamo noi, con attese che raddoppiano.
    Lo stream NON viene chiuso a scheda nascosta: è da lì che devono arrivare
    gli avvisi mentre si lavora ad altro. */
-let ES = null, retryMs = 3000, retryTimer = null, apertaAlle = 0, pushAttivata = false;
+let ES = null, retryMs = 3000, retryTimer = null, apertaAlle = 0, pushAttivata = false, avvioServer = null;
 
 function chiudiStream(){
   if (retryTimer) { clearTimeout(retryTimer); retryTimer = null; }
@@ -880,11 +880,19 @@ function connect(){
   chiudiStream();
   apertaAlle = Date.now();
   ES = new EventSource("/api/stream");
-  ES.addEventListener("hello", () => {
+  ES.addEventListener("hello", e => {
     $("live").classList.add("on"); $("liveTxt").textContent = "online · sincronizzato";
-    /* una volta sola: prima ripartiva a ogni riconnessione, aggiungendo due
-       richieste per ciclo proprio mentre il server era già sotto pressione */
-    if (!pushAttivata) { pushAttivata = true; attivaPush(); }
+    /* Iscrizione push: non a ogni riconnessione (erano due richieste in più per
+       ciclo, proprio mentre il server era sotto pressione), ma nemmeno una volta
+       sola: se il server si è riavviato ha perso l'elenco delle iscrizioni, e una
+       pagina rimasta aperta tutta la notte smetterebbe di ricevere gli avvisi.
+       Il server manda un codice che cambia a ogni avvio: ci si reiscrive quando cambia. */
+    let avvio = null;
+    try { avvio = JSON.parse(e.data || "{}").avvio || null; } catch (err) {}
+    if (!pushAttivata || avvio !== avvioServer) {
+      pushAttivata = true; avvioServer = avvio;
+      attivaPush();
+    }
   });
   /* numero totale di computer con l'app aperta (non dice quali né di chi) */
   ES.addEventListener("collegati", e => {
