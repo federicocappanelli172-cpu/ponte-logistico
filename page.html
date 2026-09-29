@@ -178,6 +178,29 @@
   .empty .ic{font-size:38px;opacity:.75}
   .empty .etxt b{color:var(--txt)}
   .stream{position:relative}
+
+  /* ---------- cronologia spedizioni partite ---------- */
+  #btnStorico{background:var(--panel2);color:var(--txt);border:1px solid var(--line);
+    border-radius:var(--r-sm);padding:8px 12px;font-size:11.5px;font-weight:600;cursor:pointer;
+    display:flex;align-items:center;gap:6px;transition:.12s;white-space:nowrap}
+  #btnStorico:hover{border-color:var(--acc)}
+  #btnStorico.on{background:var(--acc-dim);color:var(--acc);border-color:rgba(77,168,255,.45)}
+  #btnStorico .n{font-variant-numeric:tabular-nums;opacity:.8}
+  .storico-head{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+  .storico-head .tit{font-size:13px;font-weight:750}
+  .storico-head .sub{font-size:11.5px;color:var(--muted)}
+  .storico-head button{background:var(--panel2);color:var(--txt);border:1px solid var(--line);
+    border-radius:var(--r-sm);padding:7px 12px;font-size:12px;font-weight:650;cursor:pointer}
+  .storico-head button:hover{border-color:var(--acc)}
+  .giorno{font-size:10.5px;font-weight:800;letter-spacing:.5px;color:var(--muted);text-transform:uppercase;
+    margin:6px 2px -4px}
+  .card.old{padding:12px 16px;box-shadow:none;background:rgba(255,255,255,.02)}
+  .card.old .top{margin-bottom:6px}
+  .card.old .route{font-size:14px;margin-bottom:4px}
+  .card.old .who{margin-bottom:0}
+  .card.old .bordo{font-size:12px;color:var(--muted);margin-top:6px;line-height:1.5}
+  .card.old .bordo b{color:var(--ok)}
+  body.vista-storico .composer{display:none}
   .stream:empty::after{content:""}
 
   .skel{display:flex;flex-direction:column;gap:14px}
@@ -298,7 +321,7 @@
     .stream{padding:14px}
     .composer{padding:12px 14px;padding-bottom:calc(12px + env(safe-area-inset-bottom))}
     .notif-label{display:none}
-    #btnNotif{padding:9px}
+    #btnNotif,#btnStorico{padding:9px}
     .modal{width:100%}
     .right{gap:7px}
     .login-card{padding:22px 18px}
@@ -403,6 +426,7 @@
       </div>
     </div>
     <div class="right">
+      <button id="btnStorico" title="Spedizioni già partite">📜 <span class="notif-label">Cronologia</span> <span class="n" id="storicoN"></span></button>
       <button id="btnNotif" title="Attiva gli avvisi anche a scheda abbassata">🔔 <span class="notif-label">Attiva notifiche</span></button>
       <div class="whochip" id="whoChip" role="button" tabindex="0" title="Cambia reparto">
         <span class="av" id="whoAv">?</span>
@@ -696,15 +720,29 @@ $("loginCancel").onclick = () => $("login").classList.remove("on", "switching");
 renderMe();
 if (!REP) apriLogin(false);
 
+/* ---------- spedizioni attive / partite ----------
+   Una spedizione risulta "PARTITA" 5 minuti dopo l'ora di partenza; 15 minuti dopo
+   lascia la lista e passa nella Cronologia (sparisce del tutto dopo 30 giorni, come prima).
+   Quelle senza ora di partenza restano nella lista finché qualcuno non le elimina. */
+const PASSA_IN_CRONOLOGIA_MS = (5 + 15) * 60000;
+function partita(it){ return !!it.departAt && Date.now() >= it.departAt + PASSA_IN_CRONOLOGIA_MS; }
+function attive(t){ return t ? t.items.filter(it => !partita(it)) : []; }
+function partite(t){
+  return t ? t.items.filter(partita).sort((a, b) => b.departAt - a.departAt) : [];
+}
+let VISTA = "attive";
+$("btnStorico").onclick = () => { VISTA = VISTA === "storico" ? "attive" : "storico"; renderAll(); };
+
 /* ---------- render ---------- */
 function renderTratte(){
   const c = $("tratte"); c.innerHTML = "";
   DB.tratte.forEach(t => {
     const el = document.createElement("div");
     el.className = "tratta" + (t.id === ACTIVE ? " active" : "");
+    const n = attive(t).length;
     el.innerHTML = `<span class="dot"></span>
       <div class="body"><div class="nm">${esc(t.nome)}</div><div class="sub">${esc(t.sub||"")}</div></div>
-      ${t.items.length ? `<span class="cnt">${t.items.length}</span>` : ""}<button class="del" title="Elimina tratta" aria-label="Elimina tratta">&times;</button>`;
+      ${n ? `<span class="cnt">${n}</span>` : ""}<button class="del" title="Elimina tratta" aria-label="Elimina tratta">&times;</button>`;
     el.onclick = async (e) => {
       const tgt = e.target;
       if (tgt && tgt.className === "del") {
@@ -712,7 +750,7 @@ function renderTratte(){
         if (ok) { rpc("/api/deltratta", { trattaId: t.id }).then(() => { if (ACTIVE === t.id) ACTIVE = null; }); }
         return;
       }
-      ACTIVE = t.id; localStorage.setItem("pl_active", ACTIVE); renderAll();
+      ACTIVE = t.id; localStorage.setItem("pl_active", ACTIVE); VISTA = "attive"; renderAll();
       if (isMobile()) closeDrawer();
     };
     c.appendChild(el);
@@ -721,10 +759,15 @@ function renderTratte(){
 function renderHeader(){
   const t = cur(); if (!t) return;
   $("hTitle").textContent = t.nome;
-  const last = t.items[0];
-  $("hMeta").textContent = last
-    ? `${t.items.length} spedizioni · ultima: ${last.from} → ${last.to}`
-    : "Nessuna spedizione pubblicata";
+  const lista = attive(t), last = lista[0], nPartite = partite(t).length;
+  $("storicoN").textContent = nPartite ? "(" + nPartite + ")" : "";
+  $("btnStorico").classList.toggle("on", VISTA === "storico");
+  document.body.classList.toggle("vista-storico", VISTA === "storico");
+  $("hMeta").textContent = VISTA === "storico"
+    ? `Cronologia · ${nPartite} ${nPartite === 1 ? "spedizione partita" : "spedizioni partite"}`
+    : last
+      ? `${lista.length} spedizioni · ultima: ${last.from} → ${last.to}`
+      : "Nessuna spedizione in partenza";
   $("bJoin").disabled = !last;
   $("bSkip").disabled = !last;
   $("hint").innerHTML = last
@@ -734,14 +777,17 @@ function renderHeader(){
 function renderStream(){
   const s = $("stream"), t = cur();
   if (firstRender) { firstRender = false; }
+  if (VISTA === "storico") { renderStorico(s, t); return; }
   s.innerHTML = "";
-  if (!t || !t.items.length){
+  const visibili = attive(t);
+  if (!t || !visibili.length){
+    const n = partite(t).length;
     s.innerHTML = `<div class="empty"><div class="ic">📦</div>
       <div class="etxt">Nessuna spedizione in partenza su questa tratta.<br>
-      Premi <b>🚚 Spedizione in partenza</b> per pubblicarne una.</div></div>`;
+      Premi <b>🚚 Spedizione in partenza</b> per pubblicarne una.${n ? `<br>Le spedizioni già partite sono in <b>📜 Cronologia</b>.` : ""}</div></div>`;
     return;
   }
-  t.items.forEach(item => {
+  visibili.forEach(item => {
     const rep = item.rep || item.fromRep || "";
     const cls = repCls(rep);
     const joins = item.votes.filter(v => v.choice === "join");
@@ -774,9 +820,56 @@ function renderStream(){
     s.appendChild(card);
   });
 }
+function giornoDi(ts){
+  const f = d => new Date(d).toLocaleDateString("it-IT", { timeZone: "Europe/Rome" });
+  if (f(ts) === f(Date.now())) return "Oggi";
+  if (f(ts) === f(Date.now() - 86400000)) return "Ieri";
+  return new Date(ts).toLocaleDateString("it-IT", { timeZone: "Europe/Rome", weekday: "long", day: "numeric", month: "long" });
+}
+function renderStorico(s, t){
+  const lista = partite(t);
+  s.innerHTML = `<div class="storico-head"><div><div class="tit">📜 Spedizioni partite</div>
+    <div class="sub">Restano qui per 30 giorni, poi si cancellano da sole.</div></div>
+    <button id="storicoBack">← Torna alle spedizioni</button></div>`;
+  $("storicoBack").onclick = () => { VISTA = "attive"; renderAll(); };
+  if (!lista.length){
+    s.insertAdjacentHTML("beforeend", `<div class="empty"><div class="ic">📜</div>
+      <div class="etxt">Nessuna spedizione partita su questa tratta.<br>
+      Compaiono qui 15 minuti dopo la scritta <b>SPEDIZIONE PARTITA</b>.</div></div>`);
+    return;
+  }
+  let giorno = "";
+  lista.forEach(item => {
+    const g = giornoDi(item.departAt);
+    if (g !== giorno) { giorno = g; s.insertAdjacentHTML("beforeend", `<div class="giorno">${esc(g)}</div>`); }
+    const rep = item.rep || item.fromRep || "";
+    const joins = item.votes.filter(v => v.choice === "join").map(v => v.who);
+    const skips = item.votes.filter(v => v.choice === "skip").length;
+    const card = document.createElement("div");
+    card.className = "card old"; card.dataset.id = item.id;
+    card.innerHTML = `
+      <button class="delitem" title="Elimina dalla cronologia" aria-label="Elimina dalla cronologia">&times;</button>
+      <div class="top">
+        <span class="chip ${repCls(rep)}">${esc((rep || "—").toUpperCase())}</span>
+        <span class="time">✅ partita alle ${esc(item.when||"—")}</span>
+      </div>
+      <div class="route">🚚 ${esc(item.from)} <span style="color:var(--muted)">→</span> ${esc(item.to)}</div>
+      ${item.note ? `<div class="note">${esc(item.note)}</div>` : ""}
+      <div class="who">Pubblicata da <b>${esc(item.by)}</b> · ${esc(item.at)}</div>
+      <div class="bordo">${joins.length ? `A bordo: <b>${joins.map(esc).join(", ")}</b>` : "Nessuno a bordo"}${skips ? ` · ❌ ${skips} non si sono uniti` : ""}</div>`;
+    card.querySelector(".delitem").onclick = async () => {
+      const ok = await askConfirm("Eliminare dalla cronologia?", `${item.from} → ${item.to} verrà rimossa per tutti.`);
+      if (ok) rpc("/api/delitem", { trattaId: t.id, itemId: item.id });
+    };
+    s.appendChild(card);
+  });
+}
 function renderAll(){ renderTratte(); renderHeader(); renderStream(); }
 function focusCard(trattaId, itemId){
-  ACTIVE = trattaId; localStorage.setItem("pl_active", ACTIVE); renderAll();
+  ACTIVE = trattaId; localStorage.setItem("pl_active", ACTIVE);
+  const it = cur() && cur().items.find(i => i.id == itemId);
+  VISTA = it && partita(it) ? "storico" : "attive";
+  renderAll();
   const c = document.querySelector(`.card[data-id="${itemId}"]`);
   if (c) { c.classList.add("flash"); c.scrollIntoView({ behavior:"smooth", block:"center" });
     setTimeout(() => c.classList.remove("flash"), 2500); }
@@ -941,8 +1034,8 @@ $("mOk").onclick = () => {
   shipAPI({ from, to, when: when || "non indicato", note: $("fNote").value.trim() });
   $("modalBg").classList.remove("on");
 };
-$("bJoin").onclick = () => { const i = cur() && cur().items[0]; if (i) voteAPI(i, "join"); };
-$("bSkip").onclick = () => { const i = cur() && cur().items[0]; if (i) voteAPI(i, "skip"); };
+$("bJoin").onclick = () => { const i = attive(cur())[0]; if (i) voteAPI(i, "join"); };
+$("bSkip").onclick = () => { const i = attive(cur())[0]; if (i) voteAPI(i, "skip"); };
 
 /* ---------- UI: nuova tratta ---------- */
 $("newTratta").onclick = () => {
@@ -1047,7 +1140,8 @@ setInterval(() => {
 }, 20000);
 
 /* ricarica la lista ogni 30s per aggiornare anche i badge */
-setInterval(() => { if (DB && DB.tratte) renderStream(); }, 30000);
+/* (anche per spostare in Cronologia le spedizioni partite; nella Cronologia non ridisegna la lista, per non perdere lo scorrimento) */
+setInterval(() => { if (!DB || !DB.tratte) return; if (VISTA === "storico") { renderTratte(); renderHeader(); } else renderAll(); }, 30000);
 
 setTimeout(() => { if ("Notification" in window && Notification.permission === "granted") { $("btnNotif").classList.add("on"); $("btnNotif").innerHTML = '🔔 <span class="notif-label">Notifiche attive</span>'; } }, 400);
 
