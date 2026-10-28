@@ -21,7 +21,12 @@ const PORT = Number(process.env.PORT) || 3000;
    in maiuscolo si leggevano e cancellavano le spedizioni senza codice. Con questa
    impostazione le route rispondono solo all'indirizzo scritto esattamente così. */
 app.set("case sensitive routing", true);
-app.use(express.json({ limit: "2mb" }));
+/* SICUREZZA: questo lettore dei messaggi viene prima del codice d'accesso, quindi lo
+   raggiunge chiunque. inflate:false rifiuta i messaggi compressi (la pagina non ne manda
+   mai): è la difesa indicata da Express per CVE-2026-111181, con cui una sola richiesta
+   compressa poteva far crollare il server, e con lui i dati salvati. 100 KB bastano e
+   avanzano: prima ne accettava 2 MB, che venivano letti anche da chi non ha il codice. */
+app.use(express.json({ limit: "100kb", inflate: false }));
 
 /* ---------- Solo da computer: dal telefono si vede solo un avviso ---------- */
 const RE_TELEFONO = /Mobi|iPhone|iPod|Android.+Mobile|Windows Phone|BlackBerry|BB10|Opera Mini|IEMobile/i;
@@ -482,6 +487,19 @@ app.get("*", function(req, res){
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.setHeader("Cache-Control", "no-cache");
   res.send(eTitolare(req) ? PAGE_TITOLARE : PAGE);
+});
+
+/* SICUREZZA: senza questo, Express (se su Render manca NODE_ENV=production) risponde a un
+   messaggio malformato con il dettaglio tecnico dell'errore: percorsi dei file e librerie
+   usate. Ora chi sbaglia riceve solo un messaggio generico. Nessun dato su chi ha inviato
+   la richiesta finisce nei log. */
+app.use(function(err, req, res, next){
+  if (res.headersSent) return next(err);
+  const stato = Number(err && (err.status || err.statusCode)) || 500;
+  if (stato >= 500) console.error("Errore interno:", err && err.message);
+  res.status(stato >= 400 && stato < 600 ? stato : 500).json({
+    error: stato === 413 ? "messaggio troppo grande" : stato < 500 ? "richiesta non valida" : "errore del server",
+  });
 });
 
 app.listen(PORT, "0.0.0.0", function(){
