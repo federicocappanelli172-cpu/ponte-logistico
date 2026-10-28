@@ -16,6 +16,11 @@ const app = express();
    push salvate su file, e le pagine rimaste aperte devono sapere che vanno rifatte. */
 const AVVIO = crypto.randomBytes(6).toString("hex");
 const PORT = Number(process.env.PORT) || 3000;
+/* SICUREZZA: Express di serie tratta "/API/state" e "/api/state" come la stessa route,
+   mentre il controllo del codice d'accesso guarda il testo esatto: scrivendo l'indirizzo
+   in maiuscolo si leggevano e cancellavano le spedizioni senza codice. Con questa
+   impostazione le route rispondono solo all'indirizzo scritto esattamente così. */
+app.set("case sensitive routing", true);
 app.use(express.json({ limit: "2mb" }));
 
 /* ---------- Solo da computer: dal telefono si vede solo un avviso ---------- */
@@ -138,7 +143,10 @@ app.post("/api/login", function(req, res){
   res.json({ ok: true });
 });
 app.use(function(req, res, next){
-  if (req.path.indexOf("/api/") !== 0 || req.path === "/api/login" || autorizzato(req)) return next();
+  /* confronto senza maiuscole/minuscole: seconda difesa, nel caso la regola sopra
+     venisse tolta o un aggiornamento di Express cambiasse comportamento */
+  const p = req.path.toLowerCase();
+  if (p.indexOf("/api/") !== 0 || p === "/api/login" || autorizzato(req)) return next();
   res.status(401).json({ error: "codice" });
 });
 
